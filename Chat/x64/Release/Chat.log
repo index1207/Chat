@@ -1,8 +1,2 @@
-﻿  main.cpp
-D:\Project\Chat\Chat\main.cpp(114,13): warning C4267: '인수': 'size_t'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-D:\Project\Chat\Chat\main.cpp(133,1): warning C4267: '=': 'size_t'에서 'ULONG'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-  코드를 생성하고 있습니다.
-  Previous IPDB and IOBJ mismatch, fall back to full compilation.
-  All 364 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
-  코드를 생성했습니다.
-  Chat.vcxproj -> D:\Project\Chat\x64\Release\Chat.exe
+﻿  stdafx.cpp
+D:\Project\Chat\Chat\stdafx.h(17,10): fatal error C1083: 포함 파일을 열 수 없습니다. 'ThreadPool.h': No such file or directory

@@ -1,9 +1,27 @@
 #pragma comment(lib, "ws2_32.lib")
 
 #include <iostream>
+#include <format>
 
 #include <WinSock2.h>
 #include <WS2tcpip.h>
+
+class Packet {
+public:
+	Packet(std::string room, std::string id, std::string message)
+		: len(0), flag(0)
+	{
+		buf.buf = cbuf;
+		buf.len = 1024;
+		auto str = std::format("[{}][{}] {}", room, id, message);
+		memcpy(&buf, str.c_str(), str.length());
+	}
+	WSABUF buf;
+	DWORD len;
+	DWORD flag;
+private:
+	char cbuf[1024];
+};
 
 class ChatClient {
 public:
@@ -34,7 +52,18 @@ public:
 		register_user();
 	}
 	void loop() {
-		
+		char msg[128] = "";
+		std::cin >> msg;
+		Packet pack(roomName, userName, msg);
+		if (WSASend(sock, &pack.buf, 1, &pack.len, pack.flag, &ov, NULL) == SOCKET_ERROR) {
+			if (WSAGetLastError() == WSA_IO_PENDING) {
+				WSAWaitForMultipleEvents(1, &ev, TRUE, WSA_INFINITE, FALSE);
+				WSAGetOverlappedResult(sock, &ov, &pack.len, TRUE, &pack.flag);
+			}
+			else {
+				show_ws2_err();
+			}
+		}
 	}
 private:
 	void show_ws2_err() {
@@ -52,29 +81,46 @@ private:
 		exit(EXIT_FAILURE);
 	}
 	void register_user() {
-		char userName[32] = "", roomName[16] = "";
-		while (true) {
-			std::cout << "User : ";
-			std::cin >> userName;
-			if (send(sock, userName, 32, NULL) == SOCKET_ERROR) {
-				show_ws2_err();
-			}
-			char buf[16];
-			if (recv(sock, buf, 16, NULL) == SOCKET_ERROR) {
-				show_ws2_err();
-			}
-			if (strcmp(buf, "exist")) break;
-			else {
-				std::cout << "이미 존재하는 닉네임입니다.\n";
-			}
-		}
+		std::cout << "User : ";
+		std::cin >> userName;
 		std::cout << "Room : ";
 		std::cin >> roomName;
-		if (send(sock, roomName, 16, NULL) == SOCKET_ERROR) {
-			show_ws2_err();
+		Packet pack(roomName, userName, "");
+		if (WSASend(sock, &pack.buf, 1, &pack.len, pack.flag, &ov, NULL) == SOCKET_ERROR) {
+			if (WSAGetLastError() == WSA_IO_PENDING) {
+				WSAWaitForMultipleEvents(1, &ev, TRUE, WSA_INFINITE, FALSE);
+				WSAGetOverlappedResult(sock, &ov, &pack.len, TRUE, &pack.flag);
+			}
 		}
 	}
 private:
+	class Buffer {
+	public:
+		Buffer(size_t max) : buf(new char[max]) {
+			memset(buf, 0, max);
+			wb.buf = buf;
+			wb.len = max;
+		}
+		~Buffer() {
+			delete[] buf;
+		}
+		LPWSABUF operator&() {
+			return &wb;
+		}
+		char* operator*() {
+			return buf;
+		}
+		std::string data() {
+			return buf;
+		}
+	private:
+		WSABUF wb;
+		char* buf;
+	};
+private:
+	std::string userName;
+	std::string roomName;
+
 	WSADATA wsaData;
 	SOCKET sock;
 	SOCKADDR_IN	adr;
