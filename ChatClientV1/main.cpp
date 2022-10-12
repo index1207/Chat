@@ -23,6 +23,11 @@ private:
 	char cbuf[1024];
 };
 
+namespace std {
+	std::string to_string(Packet& pack) {
+		return pack.buf.buf;
+	}
+}
 class ChatClient {
 public:
 	ChatClient() {
@@ -52,18 +57,6 @@ public:
 		register_user();
 	}
 	void loop() {
-		char msg[128] = "";
-		std::cin >> msg;
-		Packet pack(roomName, userName, msg);
-		if (WSASend(sock, &pack.buf, 1, &pack.len, pack.flag, &ov, NULL) == SOCKET_ERROR) {
-			if (WSAGetLastError() == WSA_IO_PENDING) {
-				WSAWaitForMultipleEvents(1, &ev, TRUE, WSA_INFINITE, FALSE);
-				WSAGetOverlappedResult(sock, &ov, &pack.len, TRUE, &pack.flag);
-			}
-			else {
-				show_ws2_err();
-			}
-		}
 	}
 private:
 	void show_ws2_err() {
@@ -81,46 +74,8 @@ private:
 		exit(EXIT_FAILURE);
 	}
 	void register_user() {
-		std::cout << "User : ";
-		std::cin >> userName;
-		std::cout << "Room : ";
-		std::cin >> roomName;
-		Packet pack(roomName, userName, "");
-		if (WSASend(sock, &pack.buf, 1, &pack.len, pack.flag, &ov, NULL) == SOCKET_ERROR) {
-			if (WSAGetLastError() == WSA_IO_PENDING) {
-				WSAWaitForMultipleEvents(1, &ev, TRUE, WSA_INFINITE, FALSE);
-				WSAGetOverlappedResult(sock, &ov, &pack.len, TRUE, &pack.flag);
-			}
-		}
 	}
 private:
-	class Buffer {
-	public:
-		Buffer(size_t max) : buf(new char[max]) {
-			memset(buf, 0, max);
-			wb.buf = buf;
-			wb.len = max;
-		}
-		~Buffer() {
-			delete[] buf;
-		}
-		LPWSABUF operator&() {
-			return &wb;
-		}
-		char* operator*() {
-			return buf;
-		}
-		std::string data() {
-			return buf;
-		}
-	private:
-		WSABUF wb;
-		char* buf;
-	};
-private:
-	std::string userName;
-	std::string roomName;
-
 	WSADATA wsaData;
 	SOCKET sock;
 	SOCKADDR_IN	adr;
