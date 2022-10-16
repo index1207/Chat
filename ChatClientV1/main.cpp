@@ -2,44 +2,25 @@
 
 #include <iostream>
 #include <format>
-
+#include <thread>
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 
-class Packet {
-public:
-	Packet(std::string room, std::string id, std::string message)
-		: len(0), flag(0)
-	{
-		buf.buf = cbuf;
-		buf.len = 1024;
-		auto str = std::format("[{}][{}] {}", room, id, message);
-		memcpy(&buf, str.c_str(), str.length());
-	}
-	WSABUF buf;
-	DWORD len;
-	DWORD flag;
-private:
-	char cbuf[1024];
-};
-
-namespace std {
-	std::string to_string(Packet& pack) {
-		return pack.buf.buf;
-	}
-}
 class ChatClient {
 public:
-	ChatClient() {
+	ChatClient() : len(0), flag(0) {
 		if (WSAStartup(MAKEWORD(2, 2), &wsaData)) {
 			show_ws2_err();
 		}
+		wb.buf = buf; wb.len = 1024;
 	}
 	~ChatClient() {
 		WSACleanup();
 	}
 public:
 	void init() {
+		memset(&buf, 0, 1024);
+
 		sock = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, NULL, WSA_FLAG_OVERLAPPED);
 		if (sock == INVALID_SOCKET) {
 			show_ws2_err();
@@ -49,14 +30,19 @@ public:
 		adr.sin_port = htons(1225);
 		inet_pton(AF_INET, "127.0.0.1", &adr.sin_addr);
 
-		connect(sock, (SOCKADDR*)&adr, sizeof(SOCKADDR_IN));
-
 		ev = WSACreateEvent();
 		ov.hEvent = ev;
 
-		register_user();
+		connect(sock, (SOCKADDR*)&adr, sizeof(SOCKADDR_IN));
 	}
 	void loop() {
+		memset(&buf, 0, 1024);
+		std::cin >> buf;
+		if (WSASend(sock, &wb, 1, &len, flag, &ov, NULL) == SOCKET_ERROR) {
+			if (WSAGetLastError() != WSA_IO_PENDING) {
+				show_ws2_err();
+			}
+		}
 	}
 private:
 	void show_ws2_err() {
@@ -73,8 +59,6 @@ private:
 		MessageBox(NULL, message.c_str(), TEXT("[ERROR]"), MB_ICONERROR | MB_OK);
 		exit(EXIT_FAILURE);
 	}
-	void register_user() {
-	}
 private:
 	WSADATA wsaData;
 	SOCKET sock;
@@ -82,6 +66,11 @@ private:
 
 	OVERLAPPED ov;
 	WSAEVENT ev;
+
+	char buf[1024];
+	WSABUF wb;
+	DWORD len;
+	DWORD flag;
 };
 
 int main() {

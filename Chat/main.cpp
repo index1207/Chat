@@ -1,6 +1,30 @@
 #include "stdafx.h"
 #include <format>
 
+class Packet {
+public:
+private:
+};
+
+class Buffer {
+public:
+	Buffer() {
+		wb.buf = buf;
+		wb.len = 1024;
+	}
+	DWORD len = 0;
+	DWORD flag = 0;
+	WSABUF* operator&() {
+		return &wb;
+	}
+	std::string Get() const {
+		return buf;
+	}
+private:
+	char buf[1024];
+	WSABUF wb;
+};
+
 class Chat {
 public:
 	Chat() {
@@ -33,8 +57,8 @@ public:
 
 		evnt = WSACreateEvent();
 		overlap.hEvent = evnt;
-
-		userConnection();
+		
+		AcceptProcess();
 	}
 	void loop() {
 	}
@@ -53,20 +77,32 @@ private:
 		MessageBox(NULL, message.c_str(), TEXT("[ERROR]"), MB_ICONERROR | MB_OK);
 		exit(EXIT_FAILURE);
 	}
-	void userConnection() {
-		std::thread conn[16];
-		std::generate(std::begin(conn), std::end(conn), [this, i=0]() mutable {
+	void AcceptProcess() {
+		std::thread acc[16];
+		std::generate(std::begin(acc), std::end(acc), [this, i=0]() mutable {
 			return std::thread([this](int i) {
 				clients[i].first = accept(listen_sock, (SOCKADDR*)&clients[i].second, &addrlen);
 				if (clients[i].first == INVALID_SOCKET) {
-					ShowAPIErrorMessage();
 					return;
 				}
-				std::cout << "[System] Connected : " << clients[i].first << '\n';
+				std::cout << "[System] Connected " << clients[i].first << '\n';
+
+				std::thread{[&]() {
+					while (true) {
+						if (WSARecv(clients[i].first, &cb[i], 1, &cb[i].len, &cb[i].flag, &overlap, NULL) == SOCKET_ERROR) {
+							if (WSAGetLastError() == WSA_IO_PENDING) {
+								WSAWaitForMultipleEvents(1, &evnt, TRUE, WSA_INFINITE, FALSE);
+								WSAGetOverlappedResult(clients[i].first, &overlap, &cb[i].len, TRUE, &cb[i].flag);
+
+								std::cout << std::format("[Client({})] {}\n", i, cb[i].Get());
+							}
+						}
+					}
+				}}.join();
 			}, i++);
 		});
-		for (auto& t : conn) {
-			t.detach();
+		for (auto& thr : acc) {
+			thr.detach();
 		}
 	}
 private:
@@ -76,12 +112,10 @@ private:
 	int szAdr = sizeof(SOCKADDR_IN);
 
 	std::pair<SOCKET, SOCKADDR_IN> clients[16];
-	std::vector<std::string> roomList;
-	std::vector<std::string> userList;
-	std::mutex mtx;
+	Buffer cb[16];
 	int addrlen = sizeof(SOCKADDR_IN);
 
-	std::map<std::string, std::string> room;
+	std::thread cnn[16];
 
 	OVERLAPPED overlap;
 	WSAEVENT evnt;
